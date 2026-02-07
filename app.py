@@ -60,7 +60,8 @@ def init_db() -> None:
                 company_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
                 created_by INTEGER NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                UNIQUE(company_id, name)
             );
 
             CREATE TABLE IF NOT EXISTS employees (
@@ -69,7 +70,8 @@ def init_db() -> None:
                 name TEXT NOT NULL,
                 phone TEXT,
                 daily_wage REAL NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                UNIQUE(company_id, name)
             );
 
             CREATE TABLE IF NOT EXISTS team_members (
@@ -256,12 +258,20 @@ def logout():
 def teams():
     """团队列表与创建。"""
     company_id = session["company_id"]
+    search_keyword = request.args.get("q", "").strip()
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         if not name:
             flash("团队名称不能为空")
         else:
             with get_db() as conn:
+                existing = conn.execute(
+                    "SELECT 1 FROM teams WHERE company_id = ? AND name = ?",
+                    (company_id, name),
+                ).fetchone()
+                if existing:
+                    flash("团队名称已存在")
+                    return redirect(url_for("teams", q=search_keyword))
                 conn.execute(
                     """
                     INSERT INTO teams (company_id, name, created_by, created_at)
@@ -271,19 +281,21 @@ def teams():
                 )
             log_action(company_id, session["user_id"], f"创建团队：{name}")
             flash("团队创建成功")
-            return redirect(url_for("teams"))
+            return redirect(url_for("teams", q=search_keyword))
     with get_db() as conn:
-        team_list = conn.execute(
-            """
+        team_query = """
             SELECT teams.*, users.username AS creator
             FROM teams
             JOIN users ON teams.created_by = users.id
             WHERE teams.company_id = ?
-            ORDER BY teams.id DESC
-            """,
-            (company_id,),
-        ).fetchall()
-    return render_template("teams/teams.html", teams=team_list)
+        """
+        team_params: list[object] = [company_id]
+        if search_keyword:
+            team_query += " AND teams.name LIKE ?"
+            team_params.append(f"%{search_keyword}%")
+        team_query += " ORDER BY teams.id DESC"
+        team_list = conn.execute(team_query, team_params).fetchall()
+    return render_template("teams/teams.html", teams=team_list, search_keyword=search_keyword)
 
 
 @app.route("/teams/<int:team_id>", methods=["GET", "POST"])
@@ -338,6 +350,13 @@ def team_detail(team_id: int):
                 flash("员工姓名不能为空")
             else:
                 with get_db() as conn:
+                    existing = conn.execute(
+                        "SELECT 1 FROM employees WHERE company_id = ? AND name = ?",
+                        (company_id, name),
+                    ).fetchone()
+                    if existing:
+                        flash("员工姓名已存在")
+                        return redirect(url_for("team_detail", team_id=team_id, q=search_keyword))
                     cursor = conn.execute(
                         """
                         INSERT INTO employees (company_id, name, phone, daily_wage, created_at)
@@ -490,6 +509,13 @@ def employees():
             flash("员工姓名不能为空")
         else:
             with get_db() as conn:
+                existing = conn.execute(
+                    "SELECT 1 FROM employees WHERE company_id = ? AND name = ?",
+                    (company_id, name),
+                ).fetchone()
+                if existing:
+                    flash("员工姓名已存在")
+                    return redirect(url_for("employees", q=search_keyword))
                 conn.execute(
                     """
                     INSERT INTO employees (company_id, name, phone, daily_wage, created_at)

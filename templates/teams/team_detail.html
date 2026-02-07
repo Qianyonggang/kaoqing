@@ -4,8 +4,15 @@
   <div class="col-lg-5">
     <div class="card shadow-sm">
       <div class="card-body">
-        <h5 class="card-title">{{ team['name'] }} - 新增员工</h5>
-        <form method="post">
+        <h5 class="card-title">{{ team['name'] }} - 添加成员方式</h5>
+        <div class="mb-3">
+          <label class="form-label">选择添加方式</label>
+          <select class="form-select" id="memberMode">
+            <option value="existing" selected>添加已有员工</option>
+            <option value="new">新增员工并加入</option>
+          </select>
+        </div>
+        <form method="post" id="createEmployeeForm" class="d-none">
           <input type="hidden" name="action" value="create_employee" />
           <div class="mb-3">
             <label class="form-label">姓名</label>
@@ -25,8 +32,8 @@
     </div>
     <div class="card shadow-sm mt-4">
       <div class="card-body">
-        <h5 class="card-title">{{ team['name'] }} - 添加成员</h5>
-        <form method="post">
+        <h5 class="card-title">{{ team['name'] }} - 添加已有员工</h5>
+        <form method="post" id="addExistingForm">
           <input type="hidden" name="action" value="add_existing" />
           <div class="mb-3">
             <label class="form-label">选择员工</label>
@@ -90,4 +97,16 @@
     </div>
   </div>
 </div>
+<script>
+  const modeSelect = document.getElementById('memberMode');
+  const createForm = document.getElementById('createEmployeeForm');
+  const existingForm = document.getElementById('addExistingForm');
+  const toggleForms = () => {
+    const isNew = modeSelect.value === 'new';
+    createForm.classList.toggle('d-none', !isNew);
+    existingForm.classList.toggle('d-none', isNew);
+  };
+  modeSelect.addEventListener('change', toggleForms);
+  toggleForms();
+</script>
 {% endblock %}
