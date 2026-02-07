@@ -37,15 +37,16 @@
       <tbody>
         {% for member in members %}
         {% set record = attendance_map.get(member['id']) %}
-        {% set current_units = current_units_map.get(member['id'], 0) %}
-        {% set base_total = base_total_map.get(member['id'], 0) %}
+        {% set month_total = total_units_map.get(member['id'], 0) %}
+        {% set current_units = (record['work_units'] if record else 0) %}
         <tr>
           <td>{{ member['name'] }}</td>
           <td>{{ member['phone'] }}</td>
           <td style="max-width: 140px;">
             <div
               class="input-group attendance-input"
-              data-base-total="{{ base_total }}"
+              data-month-total="{{ month_total }}"
+              data-current-units="{{ current_units }}"
               data-step="0.5"
             >
               <button class="btn btn-outline-secondary btn-sm" type="button" data-delta="-1">-1</button>
@@ -64,7 +65,7 @@
             </div>
           </td>
           <td>
-            <span class="total-days" data-total>{{ base_total + current_units }}</span>
+            <span class="total-days" data-total>{{ month_total }}</span>
           </td>
           <td>
             <input
@@ -88,13 +89,14 @@
 <script>
   document.querySelectorAll('.attendance-input').forEach((group) => {
     const step = parseFloat(group.dataset.step || '0.5');
-    const baseTotal = parseFloat(group.dataset.baseTotal || '0');
+    const monthTotal = parseFloat(group.dataset.monthTotal || '0');
+    const currentUnits = parseFloat(group.dataset.currentUnits || '0');
     const input = group.querySelector('input');
     const totalCell = group.closest('tr').querySelector('[data-total]');
     const clampValue = (value) => Math.max(-1, Math.min(1, value));
     const updateTotal = (value) => {
       if (!totalCell) return;
-      const total = baseTotal + value;
+      const total = monthTotal - currentUnits + value;
       totalCell.textContent = Number.isFinite(total) ? total.toFixed(2).replace(/\\.00$/, '') : '0';
     };
     updateTotal(parseFloat(input.value || '0'));
