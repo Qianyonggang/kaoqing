@@ -1,0 +1,36 @@
+body {
+  background-color: #f5f7fb;
+}
+
+.summary-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.summary-title {
+  color: #64748b;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.summary-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.card {
+  border: none;
+  border-radius: 16px;
+}
+
+.table thead th {
+  color: #475569;
+  font-weight: 600;
+}
+
+.navbar-brand {
+  font-weight: 600;
+}
