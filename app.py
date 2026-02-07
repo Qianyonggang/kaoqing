@@ -436,10 +436,10 @@ def team_attendance(team_id: int):
             """
             SELECT employee_id, SUM(work_units) AS total_units
             FROM attendance
-            WHERE team_id = ? AND work_date LIKE ?
+            WHERE company_id = ? AND work_date LIKE ?
             GROUP BY employee_id
             """,
-            (team_id, f"{month_prefix}%"),
+            (company_id, f"{month_prefix}%"),
         ).fetchall()
         total_units_map = {row["employee_id"]: row["total_units"] or 0 for row in total_rows}
     if request.method == "POST":
