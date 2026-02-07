@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="mb-1">报表统计</h4>
+    <p class="text-muted mb-0">可按月份查看员工工作天数、工资与借支情况。</p>
+  </div>
+  {% if session.get('role') == 'owner' %}
+  <a class="btn btn-outline-success" href="{{ url_for('export_report', month=month) }}">导出 Excel</a>
+  {% endif %}
+</div>
+
+<form method="get" class="row g-3 mb-3">
+  <div class="col-auto">
+    <label class="form-label">选择月份</label>
+    <input class="form-control" type="month" name="month" value="{{ month }}" />
+  </div>
+  <div class="col-auto d-flex align-items-end">
+    <button class="btn btn-outline-primary" type="submit">查看</button>
+  </div>
+</form>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title">员工汇总</h5>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>姓名</th>
+            <th>工作天数</th>
+            <th>单日工资</th>
+            <th>借支</th>
+            <th>总工资</th>
+            <th>剩余工资</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in report_data %}
+          <tr>
+            <td>{{ row.employee['name'] }}</td>
+            <td>{{ row.total_units }}</td>
+            <td>¥{{ '%.2f'|format(row.employee['daily_wage']) }}</td>
+            <td>¥{{ '%.2f'|format(row.total_advance) }}</td>
+            <td>¥{{ '%.2f'|format(row.total_wage) }}</td>
+            <td>¥{{ '%.2f'|format(row.remaining) }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-muted text-center">暂无数据</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

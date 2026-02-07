@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-12">
+    <div class="p-4 bg-light rounded-3 shadow-sm">
+      <h2 class="mb-2">欢迎使用考勤管理平台</h2>
+      <p class="text-muted mb-0">公司：{{ company['name'] }} · 当前为 {{ session.get('role') }} 账号</p>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">团队数量</h5>
+        <p class="display-6">{{ team_count }}</p>
+        <a href="{{ url_for('teams') }}" class="btn btn-outline-primary">管理团队</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">员工数量</h5>
+        <p class="display-6">{{ employee_count }}</p>
+        <a href="{{ url_for('employees') }}" class="btn btn-outline-primary">管理员工</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

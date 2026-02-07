@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">创建团队</h5>
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">团队名称</label>
+            <input class="form-control" name="name" required />
+          </div>
+          <button class="btn btn-primary w-100" type="submit">创建</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">团队列表</h5>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead>
+              <tr>
+                <th>名称</th>
+                <th>创建人</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for team in teams %}
+              <tr>
+                <td>{{ team['name'] }}</td>
+                <td>{{ team['creator'] }}</td>
+                <td>
+                  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('team_detail', team_id=team['id']) }}">详情</a>
+                  <a class="btn btn-sm btn-outline-success" href="{{ url_for('team_attendance', team_id=team['id']) }}">考勤</a>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="3" class="text-muted text-center">暂无团队</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
