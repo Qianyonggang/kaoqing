@@ -454,10 +454,10 @@ def team_attendance(team_id: int):
                     units_value = float(work_units)
                 except ValueError:
                     units_value = 0
-                if units_value > 24:
-                    units_value = 24
-                if units_value < -24:
-                    units_value = -24
+                if units_value > 1:
+                    units_value = 1
+                if units_value < -1:
+                    units_value = -1
                 conn.execute(
                     "DELETE FROM attendance WHERE team_id = ? AND employee_id = ? AND work_date = ?",
                     (team_id, member["id"], work_date),
