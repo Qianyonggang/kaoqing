@@ -442,6 +442,15 @@ def team_attendance(team_id: int):
             (company_id, f"{month_prefix}%"),
         ).fetchall()
         total_units_map = {row["employee_id"]: row["total_units"] or 0 for row in total_rows}
+        current_units_map = {member["id"]: 0 for member in members}
+        for employee_id, row in attendance_map.items():
+            current_units_map[employee_id] = row["work_units"]
+        base_total_map = {}
+        for member in members:
+            employee_id = member["id"]
+            base_total_map[employee_id] = total_units_map.get(employee_id, 0) - current_units_map.get(
+                employee_id, 0
+            )
     if request.method == "POST":
         if selected_date > today:
             flash("不能登记未来日期的考勤")
@@ -490,6 +499,8 @@ def team_attendance(team_id: int):
         work_date=work_date,
         search_keyword=search_keyword,
         total_units_map=total_units_map,
+        base_total_map=base_total_map,
+        current_units_map=current_units_map,
         month_prefix=month_prefix,
         today=today.isoformat(),
     )
