@@ -449,9 +449,10 @@ def employee_detail(employee_id: int):
             return redirect(url_for("employees"))
         attendance_rows = conn.execute(
             """
-            SELECT attendance.*, teams.name AS team_name
+            SELECT attendance.*, teams.name AS team_name, users.username AS admin_name
             FROM attendance
             JOIN teams ON attendance.team_id = teams.id
+            JOIN users ON attendance.created_by = users.id
             WHERE attendance.employee_id = ? AND attendance.work_date LIKE ?
             ORDER BY attendance.work_date DESC
             """,
@@ -622,19 +623,26 @@ def reports():
     """查看汇总报表。"""
     company_id = session["company_id"]
     month = request.args.get("month") or datetime.now().strftime("%Y-%m")
+    team_ids = [int(team_id) for team_id in request.args.getlist("team_id") if team_id.isdigit()]
     with get_db() as conn:
+        teams = conn.execute(
+            "SELECT * FROM teams WHERE company_id = ? ORDER BY id DESC", (company_id,)
+        ).fetchall()
         employees = conn.execute(
             "SELECT * FROM employees WHERE company_id = ? ORDER BY id DESC", (company_id,)
         ).fetchall()
-        attendance_rows = conn.execute(
-            """
+        attendance_query = """
             SELECT employee_id, SUM(work_units) AS total_units
             FROM attendance
             WHERE company_id = ? AND work_date LIKE ?
-            GROUP BY employee_id
-            """,
-            (company_id, f"{month}%"),
-        ).fetchall()
+        """
+        attendance_params: list[object] = [company_id, f"{month}%"]
+        if team_ids:
+            placeholders = ",".join("?" for _ in team_ids)
+            attendance_query += f" AND team_id IN ({placeholders})"
+            attendance_params.extend(team_ids)
+        attendance_query += " GROUP BY employee_id"
+        attendance_rows = conn.execute(attendance_query, attendance_params).fetchall()
         advances_rows = conn.execute(
             """
             SELECT employee_id, SUM(amount) AS total_amount
@@ -661,7 +669,13 @@ def reports():
                 "remaining": remaining,
             }
         )
-    return render_template("reports/reports.html", month=month, report_data=report_data)
+    return render_template(
+        "reports/reports.html",
+        month=month,
+        report_data=report_data,
+        teams=teams,
+        selected_team_ids=team_ids,
+    )
 
 
 @app.route("/reports/export")
@@ -671,26 +685,36 @@ def export_report():
     """导出 Excel 报表。"""
     company_id = session["company_id"]
     month = request.args.get("month") or datetime.now().strftime("%Y-%m")
+    year = month.split("-")[0]
+    team_ids = [int(team_id) for team_id in request.args.getlist("team_id") if team_id.isdigit()]
     with get_db() as conn:
-        teams = conn.execute(
-            "SELECT * FROM teams WHERE company_id = ? ORDER BY id DESC", (company_id,)
-        ).fetchall()
+        team_query = "SELECT * FROM teams WHERE company_id = ?"
+        team_params: list[object] = [company_id]
+        if team_ids:
+            placeholders = ",".join("?" for _ in team_ids)
+            team_query += f" AND id IN ({placeholders})"
+            team_params.extend(team_ids)
+        team_query += " ORDER BY id DESC"
+        teams = conn.execute(team_query, team_params).fetchall()
         employees = conn.execute(
             "SELECT * FROM employees WHERE company_id = ?", (company_id,)
         ).fetchall()
-        attendance_rows = conn.execute(
-            """
+        attendance_query = """
             SELECT * FROM attendance
             WHERE company_id = ? AND work_date LIKE ?
-            """,
-            (company_id, f"{month}%"),
-        ).fetchall()
+        """
+        attendance_params: list[object] = [company_id, f"{year}-%"]
+        if team_ids:
+            placeholders = ",".join("?" for _ in team_ids)
+            attendance_query += f" AND team_id IN ({placeholders})"
+            attendance_params.extend(team_ids)
+        attendance_rows = conn.execute(attendance_query, attendance_params).fetchall()
         advances_rows = conn.execute(
             """
             SELECT * FROM advances
             WHERE company_id = ? AND advance_date LIKE ?
             """,
-            (company_id, f"{month}%"),
+            (company_id, f"{year}-%"),
         ).fetchall()
         team_members = conn.execute(
             "SELECT * FROM team_members"
@@ -707,6 +731,17 @@ def export_report():
     members_by_team = {}
     for member in team_members:
         members_by_team.setdefault(member["team_id"], []).append(member["employee_id"])
+    team_name_map = {team["id"]: team["name"] for team in teams}
+
+    monthly_labels = [f"{idx}月" for idx in range(1, 13)]
+    monthly_totals = {emp["id"]: {idx: 0 for idx in range(1, 13)} for emp in employees}
+    monthly_by_team: dict[tuple[int, int], dict[int, float]] = {}
+    for row in attendance_rows:
+        month_index = int(row["work_date"].split("-")[1])
+        monthly_totals[row["employee_id"]][month_index] += row["work_units"]
+        key = (row["team_id"], row["employee_id"])
+        monthly_by_team.setdefault(key, {idx: 0 for idx in range(1, 13)})
+        monthly_by_team[key][month_index] += row["work_units"]
 
     wb = Workbook()
     summary_sheet = wb.active
@@ -714,25 +749,30 @@ def export_report():
     summary_sheet.append([
         "员工姓名",
         "联系方式",
-        "工作天数",
+        "所属团队",
+        *monthly_labels,
+        "总天数",
         "单日工资",
         "借支",
         "总工资",
         "剩余工资",
     ])
     for employee in employees:
-        total_units = sum(
-            work_units
-            for (team_id, emp_id), work_units in attendance_by_team.items()
-            if emp_id == employee["id"]
-        )
+        total_units = sum(monthly_totals[employee["id"]].values())
         total_wage = total_units * employee["daily_wage"]
         total_advance = advances_map.get(employee["id"], 0)
         remaining = total_wage - total_advance
+        team_names = sorted({
+            team_name_map.get(team_id, "")
+            for (team_id, emp_id) in attendance_by_team
+            if emp_id == employee["id"]
+        })
         summary_sheet.append(
             [
                 employee["name"],
                 employee["phone"],
+                "、".join([name for name in team_names if name]) or "-",
+                *[monthly_totals[employee["id"]][idx] for idx in range(1, 13)],
                 total_units,
                 employee["daily_wage"],
                 total_advance,
@@ -746,7 +786,9 @@ def export_report():
         sheet.append([
             "员工姓名",
             "联系方式",
-            "工作天数",
+            "所属团队",
+            *monthly_labels,
+            "总天数",
             "单日工资",
             "借支",
             "总工资",
@@ -760,10 +802,13 @@ def export_report():
             total_wage = total_units * employee["daily_wage"]
             total_advance = advances_map.get(emp_id, 0)
             remaining = total_wage - total_advance
+            monthly_data = monthly_by_team.get((team["id"], emp_id), {idx: 0 for idx in range(1, 13)})
             sheet.append(
                 [
                     employee["name"],
                     employee["phone"],
+                    team["name"],
+                    *[monthly_data[idx] for idx in range(1, 13)],
                     total_units,
                     employee["daily_wage"],
                     total_advance,
@@ -775,8 +820,8 @@ def export_report():
     output = BytesIO()
     wb.save(output)
     output.seek(0)
-    filename = f"attendance_report_{month}.xlsx"
-    log_action(company_id, session["user_id"], f"导出报表 {month}")
+    filename = f"attendance_report_{year}.xlsx"
+    log_action(company_id, session["user_id"], f"导出报表 {year}")
     return send_file(
         output,
         as_attachment=True,

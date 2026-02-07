@@ -6,7 +6,7 @@
     <p class="text-muted mb-0">可按月份查看员工工作天数、工资与借支情况。</p>
   </div>
   {% if session.get('role') == 'owner' %}
-  <a class="btn btn-outline-success" href="{{ url_for('export_report', month=month) }}">导出 Excel</a>
+  <a class="btn btn-outline-success" href="{{ url_for('export_report', month=month, team_id=selected_team_ids) }}">导出 Excel</a>
   {% endif %}
 </div>
 
@@ -14,6 +14,16 @@
   <div class="col-auto">
     <label class="form-label">选择月份</label>
     <input class="form-control" type="month" name="month" value="{{ month }}" />
+  </div>
+  <div class="col-md-6">
+    <label class="form-label">选择团队（可多选）</label>
+    <select class="form-select" name="team_id" multiple>
+      {% for team in teams %}
+      <option value="{{ team['id'] }}" {% if team['id'] in selected_team_ids %}selected{% endif %}>
+        {{ team['name'] }}
+      </option>
+      {% endfor %}
+    </select>
   </div>
   <div class="col-auto d-flex align-items-end">
     <button class="btn btn-outline-primary" type="submit">查看</button>

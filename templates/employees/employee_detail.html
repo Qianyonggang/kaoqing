@@ -54,6 +54,7 @@
           <tr>
             <th>日期</th>
             <th>团队</th>
+            <th>登记管理员</th>
             <th>工作天数</th>
             <th>备注</th>
           </tr>
@@ -63,12 +64,13 @@
           <tr>
             <td>{{ row['work_date'] }}</td>
             <td>{{ row['team_name'] }}</td>
+            <td>{{ row['admin_name'] }}</td>
             <td>{{ row['work_units'] }}</td>
             <td>{{ row['notes'] or '-' }}</td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="4" class="text-muted text-center">暂无记录</td>
+            <td colspan="5" class="text-muted text-center">暂无记录</td>
           </tr>
           {% endfor %}
         </tbody>
