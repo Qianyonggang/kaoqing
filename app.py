@@ -392,7 +392,6 @@ def team_attendance(team_id: int):
     """团队每日考勤登记。"""
     company_id = session["company_id"]
     work_date = request.args.get("date") or date.today().isoformat()
-    search_keyword = request.args.get("q", "").strip()
     today = date.today()
     try:
         selected_date = date.fromisoformat(work_date)
@@ -402,7 +401,6 @@ def team_attendance(team_id: int):
         flash("不能登记未来日期的考勤")
         selected_date = today
     work_date = selected_date.isoformat()
-    month_prefix = selected_date.strftime("%Y-%m")
     with get_db() as conn:
         team = conn.execute(
             "SELECT * FROM teams WHERE id = ? AND company_id = ?", (team_id, company_id)
@@ -410,18 +408,16 @@ def team_attendance(team_id: int):
         if not team:
             flash("团队不存在")
             return redirect(url_for("teams"))
-        member_query = """
+        members = conn.execute(
+            """
             SELECT employees.*
             FROM team_members
             JOIN employees ON team_members.employee_id = employees.id
             WHERE team_members.team_id = ?
-        """
-        member_params: list[object] = [team_id]
-        if search_keyword:
-            member_query += " AND (employees.name LIKE ? OR employees.phone LIKE ?)"
-            member_params.extend([f"%{search_keyword}%", f"%{search_keyword}%"])
-        member_query += " ORDER BY employees.id DESC"
-        members = conn.execute(member_query, member_params).fetchall()
+            ORDER BY employees.id DESC
+            """,
+            (team_id,),
+        ).fetchall()
         attendance_map = {
             row["employee_id"]: row
             for row in conn.execute(
@@ -432,25 +428,6 @@ def team_attendance(team_id: int):
                 (team_id, work_date),
             ).fetchall()
         }
-        total_rows = conn.execute(
-            """
-            SELECT employee_id, SUM(work_units) AS total_units
-            FROM attendance
-            WHERE company_id = ? AND work_date LIKE ?
-            GROUP BY employee_id
-            """,
-            (company_id, f"{month_prefix}%"),
-        ).fetchall()
-        total_units_map = {row["employee_id"]: row["total_units"] or 0 for row in total_rows}
-        current_units_map = {member["id"]: 0 for member in members}
-        for employee_id, row in attendance_map.items():
-            current_units_map[employee_id] = row["work_units"]
-        base_total_map = {}
-        for member in members:
-            employee_id = member["id"]
-            base_total_map[employee_id] = total_units_map.get(employee_id, 0) - current_units_map.get(
-                employee_id, 0
-            )
     if request.method == "POST":
         if selected_date > today:
             flash("不能登记未来日期的考勤")
@@ -463,10 +440,6 @@ def team_attendance(team_id: int):
                     units_value = float(work_units)
                 except ValueError:
                     units_value = 0
-                if units_value > 1:
-                    units_value = 1
-                if units_value < -1:
-                    units_value = -1
                 conn.execute(
                     "DELETE FROM attendance WHERE team_id = ? AND employee_id = ? AND work_date = ?",
                     (team_id, member["id"], work_date),
@@ -497,11 +470,6 @@ def team_attendance(team_id: int):
         members=members,
         attendance_map=attendance_map,
         work_date=work_date,
-        search_keyword=search_keyword,
-        total_units_map=total_units_map,
-        base_total_map=base_total_map,
-        current_units_map=current_units_map,
-        month_prefix=month_prefix,
         today=today.isoformat(),
     )
 
