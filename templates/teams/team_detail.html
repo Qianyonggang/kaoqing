@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">{{ team['name'] }} - 添加成员</h5>
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">选择员工</label>
+            <select class="form-select" name="employee_id" required>
+              <option value="">请选择</option>
+              {% for employee in employees %}
+              <option value="{{ employee['id'] }}">{{ employee['name'] }} - {{ employee['phone'] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button class="btn btn-primary w-100" type="submit">添加</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="card-title">团队成员</h5>
+          <a class="btn btn-outline-success btn-sm" href="{{ url_for('team_attendance', team_id=team['id']) }}">今日考勤</a>
+        </div>
+        <div class="table-responsive mt-3">
+          <table class="table table-hover align-middle">
+            <thead>
+              <tr>
+                <th>姓名</th>
+                <th>联系方式</th>
+                <th>日薪</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for member in members %}
+              <tr>
+                <td>{{ member['name'] }}</td>
+                <td>{{ member['phone'] }}</td>
+                <td>¥{{ '%.2f'|format(member['daily_wage']) }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="3" class="text-muted text-center">暂无成员</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

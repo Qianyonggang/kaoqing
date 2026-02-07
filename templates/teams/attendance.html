@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="mb-1">{{ team['name'] }} - 考勤登记</h4>
+    <p class="text-muted mb-0">支持输入 1、0 或负数，用于手动增加或减少工作天数。</p>
+  </div>
+  <a class="btn btn-outline-primary" href="{{ url_for('team_detail', team_id=team['id']) }}">返回团队</a>
+</div>
+
+<form method="get" class="row g-3 mb-3">
+  <div class="col-auto">
+    <label class="form-label">日期</label>
+    <input class="form-control" type="date" name="date" value="{{ work_date }}" />
+  </div>
+  <div class="col-auto d-flex align-items-end">
+    <button class="btn btn-outline-secondary" type="submit">切换日期</button>
+  </div>
+</form>
+
+<form method="post">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>姓名</th>
+          <th>联系方式</th>
+          <th>工作天数</th>
+          <th>备注</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for member in members %}
+        {% set record = attendance_map.get(member['id']) %}
+        <tr>
+          <td>{{ member['name'] }}</td>
+          <td>{{ member['phone'] }}</td>
+          <td style="max-width: 140px;">
+            <div class="input-group attendance-input" data-step="1">
+              <button class="btn btn-outline-secondary btn-sm" type="button" data-action="decrease">-</button>
+              <input
+                class="form-control text-center"
+                name="work_units_{{ member['id'] }}"
+                value="{{ record['work_units'] if record else 0 }}"
+              />
+              <button class="btn btn-outline-secondary btn-sm" type="button" data-action="increase">+</button>
+            </div>
+          </td>
+          <td>
+            <input
+              class="form-control"
+              name="notes_{{ member['id'] }}"
+              value="{{ record['notes'] if record else '' }}"
+            />
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4" class="text-muted text-center">暂无成员</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <button class="btn btn-primary" type="submit">保存考勤</button>
+</form>
+
+<script>
+  document.querySelectorAll('.attendance-input').forEach((group) => {
+    const step = parseFloat(group.dataset.step || '1');
+    const input = group.querySelector('input');
+    group.addEventListener('click', (event) => {
+      const button = event.target.closest('button');
+      if (!button) return;
+      event.preventDefault();
+      const current = parseFloat(input.value || '0');
+      const next = button.dataset.action === 'increase' ? current + step : current - step;
+      input.value = Number.isFinite(next) ? next.toFixed(2).replace(/\\.00$/, '') : '0';
+    });
+  });
+</script>
+{% endblock %}
