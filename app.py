@@ -298,9 +298,14 @@ def team_detail(team_id: int):
         if not team:
             flash("团队不存在")
             return redirect(url_for("teams"))
-        employees = conn.execute(
-            "SELECT * FROM employees WHERE company_id = ? ORDER BY id DESC", (company_id,)
-        ).fetchall()
+        search_keyword = request.args.get("q", "").strip()
+        employee_query = "SELECT * FROM employees WHERE company_id = ?"
+        employee_params: list[object] = [company_id]
+        if search_keyword:
+            employee_query += " AND (name LIKE ? OR phone LIKE ?)"
+            employee_params.extend([f"%{search_keyword}%", f"%{search_keyword}%"])
+        employee_query += " ORDER BY id DESC"
+        employees = conn.execute(employee_query, employee_params).fetchall()
         members = conn.execute(
             """
             SELECT employees.*
@@ -311,19 +316,55 @@ def team_detail(team_id: int):
             (team_id,),
         ).fetchall()
     if request.method == "POST":
-        employee_id = request.form.get("employee_id")
-        if not employee_id:
-            flash("请选择员工")
-        else:
-            with get_db() as conn:
-                conn.execute(
-                    "INSERT OR IGNORE INTO team_members (team_id, employee_id) VALUES (?, ?)",
-                    (team_id, employee_id),
-                )
-            log_action(company_id, session["user_id"], f"团队{team['name']}新增员工ID:{employee_id}")
-            flash("成员添加成功")
-        return redirect(url_for("team_detail", team_id=team_id))
-    return render_template("teams/team_detail.html", team=team, employees=employees, members=members)
+        action = request.form.get("action")
+        if action == "add_existing":
+            employee_id = request.form.get("employee_id")
+            if not employee_id:
+                flash("请选择员工")
+            else:
+                with get_db() as conn:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO team_members (team_id, employee_id) VALUES (?, ?)",
+                        (team_id, employee_id),
+                    )
+                log_action(company_id, session["user_id"], f"团队{team['name']}新增员工ID:{employee_id}")
+                flash("成员添加成功")
+            return redirect(url_for("team_detail", team_id=team_id, q=search_keyword))
+        if action == "create_employee":
+            name = request.form.get("name", "").strip()
+            phone = request.form.get("phone", "").strip()
+            daily_wage = request.form.get("daily_wage", "0").strip() or "0"
+            if not name:
+                flash("员工姓名不能为空")
+            else:
+                with get_db() as conn:
+                    cursor = conn.execute(
+                        """
+                        INSERT INTO employees (company_id, name, phone, daily_wage, created_at)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (
+                            company_id,
+                            name,
+                            phone,
+                            float(daily_wage),
+                            datetime.now().isoformat(timespec="seconds"),
+                        ),
+                    )
+                    conn.execute(
+                        "INSERT OR IGNORE INTO team_members (team_id, employee_id) VALUES (?, ?)",
+                        (team_id, cursor.lastrowid),
+                    )
+                log_action(company_id, session["user_id"], f"团队{team['name']}新增员工：{name}")
+                flash("员工已创建并加入团队")
+            return redirect(url_for("team_detail", team_id=team_id, q=search_keyword))
+    return render_template(
+        "teams/team_detail.html",
+        team=team,
+        employees=employees,
+        members=members,
+        search_keyword=search_keyword,
+    )
 
 
 @app.route("/teams/<int:team_id>/attendance", methods=["GET", "POST"])
@@ -402,6 +443,7 @@ def team_attendance(team_id: int):
 def employees():
     """员工列表与创建。"""
     company_id = session["company_id"]
+    search_keyword = request.args.get("q", "").strip()
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         phone = request.form.get("phone", "").strip()
@@ -425,12 +467,42 @@ def employees():
                 )
             log_action(company_id, session["user_id"], f"新增员工：{name}")
             flash("员工创建成功")
-            return redirect(url_for("employees"))
+            return redirect(url_for("employees", q=search_keyword))
     with get_db() as conn:
-        employee_list = conn.execute(
-            "SELECT * FROM employees WHERE company_id = ? ORDER BY id DESC", (company_id,)
-        ).fetchall()
-    return render_template("employees/employees.html", employees=employee_list)
+        employee_query = "SELECT * FROM employees WHERE company_id = ?"
+        employee_params: list[object] = [company_id]
+        if search_keyword:
+            employee_query += " AND (name LIKE ? OR phone LIKE ?)"
+            employee_params.extend([f"%{search_keyword}%", f"%{search_keyword}%"])
+        employee_query += " ORDER BY id DESC"
+        employee_list = conn.execute(employee_query, employee_params).fetchall()
+    return render_template(
+        "employees/employees.html",
+        employees=employee_list,
+        search_keyword=search_keyword,
+    )
+
+
+@app.route("/employees/<int:employee_id>/delete", methods=["POST"])
+@login_required
+def delete_employee(employee_id: int):
+    """删除员工及相关数据。"""
+    company_id = session["company_id"]
+    with get_db() as conn:
+        employee = conn.execute(
+            "SELECT * FROM employees WHERE id = ? AND company_id = ?",
+            (employee_id, company_id),
+        ).fetchone()
+        if not employee:
+            flash("员工不存在")
+            return redirect(url_for("employees"))
+        conn.execute("DELETE FROM attendance WHERE employee_id = ?", (employee_id,))
+        conn.execute("DELETE FROM advances WHERE employee_id = ?", (employee_id,))
+        conn.execute("DELETE FROM team_members WHERE employee_id = ?", (employee_id,))
+        conn.execute("DELETE FROM employees WHERE id = ?", (employee_id,))
+    log_action(company_id, session["user_id"], f"删除员工：{employee['name']}")
+    flash("员工已删除")
+    return redirect(url_for("employees"))
 
 
 @app.route("/employees/<int:employee_id>")

@@ -27,6 +27,14 @@
     <div class="card shadow-sm">
       <div class="card-body">
         <h5 class="card-title">员工列表</h5>
+        <form method="get" class="row g-2 mb-3">
+          <div class="col-md-8">
+            <input class="form-control" name="q" placeholder="搜索员工姓名或电话" value="{{ search_keyword }}" />
+          </div>
+          <div class="col-md-4 d-grid">
+            <button class="btn btn-outline-primary" type="submit">搜索</button>
+          </div>
+        </form>
         <div class="table-responsive">
           <table class="table table-hover align-middle">
             <thead>
@@ -46,6 +54,9 @@
                 <td>
                   <a class="btn btn-sm btn-outline-primary" href="{{ url_for('employee_detail', employee_id=employee['id']) }}">详情</a>
                   <a class="btn btn-sm btn-outline-success" href="{{ url_for('employee_advances', employee_id=employee['id']) }}">借支</a>
+                  <form method="post" action="{{ url_for('delete_employee', employee_id=employee['id']) }}" class="d-inline">
+                    <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('确认删除该员工吗？')">删除</button>
+                  </form>
                 </td>
               </tr>
               {% else %}
